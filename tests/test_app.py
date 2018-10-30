@@ -28,7 +28,7 @@ def test_post_order(client):
         body=json.dumps(TEST_ORDER),
     )
     assert response.status == falcon.HTTP_200
-    assert 'trader_id' in response.json['data']
+    assert TEST_ORDER == response.json['data']
 
 
 def test_write_to_file(fake_trade_file):
