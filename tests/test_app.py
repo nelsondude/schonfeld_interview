@@ -2,7 +2,7 @@ import json
 
 import falcon
 
-from api import orders_util
+from api.orders_util import Trade
 
 TEST_ORDER = \
     {
@@ -51,7 +51,8 @@ def test_post_order(client):
 
 def test_write_to_file(fake_trade_file):
     orders, trader_id = TEST_ORDER['orders'], TEST_ORDER['trader_id']
-    orders_util.writeToTradesFile(trader_id, orders)
+    t = Trade(trader_id)
+    t.writeToTradesFile(orders)
     with open(fake_trade_file, 'r') as f:
         for i, line in enumerate(f):
             assert all(str(el) in line for el in orders[i].values())  # all values in the file
@@ -59,9 +60,11 @@ def test_write_to_file(fake_trade_file):
 
 
 def test_get_trader_id_trades():
-    orders_util.writeToTradesFile(TEST_ORDER['trader_id'], TEST_ORDER['orders'])
-    orders_util.writeToTradesFile(TEST_ORDER2['trader_id'], TEST_ORDER2['orders'])
-    trades = orders_util.getTradesForTrader(TEST_ORDER2['trader_id'])
+    t1 = Trade(TEST_ORDER['trader_id'])
+    t2 = Trade(TEST_ORDER2['trader_id'])
+    t1.writeToTradesFile(TEST_ORDER['orders'])
+    t2.writeToTradesFile(TEST_ORDER2['orders'])
+    trades = t2.getTradesForTrader()
     assert all(trade['symbol'] == TEST_ORDER2['orders'][i]['symbol']
                for i, trade in enumerate(trades))
 

@@ -1,5 +1,5 @@
 import falcon
-from .orders_util import writeToTradesFile, getTradesForTrader
+from .orders_util import Trade
 
 
 class Orders:
@@ -7,7 +7,8 @@ class Orders:
     def on_post(self, request, response):
         trader_id = request.media.get('trader_id')
         orders = request.media.get('orders')
-        writeToTradesFile(trader_id, orders)
+        t = Trade(trader_id)
+        t.writeToTradesFile(orders)
         response.media = {
             'data': {
                 'trader_id': trader_id,
@@ -19,7 +20,8 @@ class Orders:
 
 class TraderOrders:
     def on_get(self, request, response, trader_id):
-        trades = getTradesForTrader(trader_id)
+        t = Trade(trader_id)
+        trades = t.getTradesForTrader()
         response.media = {
             'data': trades
         }
