@@ -23,7 +23,9 @@ class Trade:
         total_sell_quantity = 0
         with open(TRADES_FILE_PATH, 'r') as f:
             for i, line in enumerate(f):  # l == line
+                if line.count(';') != 5: continue
                 l_id, l_ticker, l_quantity, l_type, l_date, l_status = line.strip().split(';')
+                l_quantity = int(l_quantity)
                 if l_id == self.trader_id or l_status == FILLED or l_ticker != ticker:  # skip if these conditions met
                     continue
                 if orderType == SELL and l_type == BUY and l_quantity <= quantity:
@@ -44,13 +46,15 @@ class Trade:
             else:
                 return {}  # cant update any trades right now
 
-    # def updateTradesFile(self, trades):
-    #     for line in fileinput.input(TRADES_FILE_PATH, inplace=True):
-    #         l_id, l_ticker, l_quantity, l_type, l_date, l_status = line.strip().split(';')
-    #         if (l_id, l_date, ) in trades:
-    #             print(";".join([l_id, l_ticker, trades[l_id, l_date], l_type, l_date, 'filled']))
-    #         else:
-    #             print(line)
+    def updateTradesFile(self, trades):
+        for line in fileinput.input(TRADES_FILE_PATH, inplace=True):
+            if line.count(';') != 5:
+                print(line.strip())
+            l_id, l_ticker, l_quantity, l_type, l_date, l_status = line.strip().split(';')
+            if (l_id, l_date, ) in trades:
+                print(";".join([l_id, l_ticker, str(trades[l_id, l_date]), l_type, l_date, 'filled']))
+            else:
+                print(line.strip())
 
     def writeToTradesFile(self, orders):
         now = datetime.datetime.now()
@@ -60,12 +64,13 @@ class Trade:
             for order in orders:
                 # all new trades are by default open
                 ticker = order.get('symbol')
-                quantity = order.get('quantity')
+                quantity = int(order.get('quantity'))
                 orderType = order.get('orderType')
                 trades_to_update = self.getUpdateTrades(ticker, quantity, orderType)
                 status = 'filled' if bool(trades_to_update) else 'open'
                 writer.writerow([self.trader_id, ticker, quantity, orderType, now, status])
-                # self.updateTradesFile(trades_to_update)
+                if trades_to_update:
+                    self.updateTradesFile(trades_to_update)
 
     def getTradesForTrader(self):
         trades = []
