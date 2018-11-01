@@ -1,3 +1,4 @@
+import csv
 import json
 
 import falcon
@@ -80,3 +81,26 @@ def test_get_trades_view(client):
     assert response.status == falcon.HTTP_200
 
 
+def test_get_trades_to_update(fake_trade_file):
+    with open(fake_trade_file, 'w', newline='') as f:
+        row = 'misty;AAPL;80;sell;2018-11-01 15:48:14.605383;open'
+        writer = csv.writer(f, delimiter=';', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+        writer.writerow(row.split(';'))
+
+    t = Trade('bob')
+    trades = t.getUpdateTrades('AAPL', 80, 'buy')
+    assert trades == {('misty', '2018-11-01 15:48:14.605383'): 80}
+
+
+def test_updated_trade_file(client, fake_trade_file):
+    client.simulate_post(
+        '/orders',
+        body=json.dumps(TEST_ORDER),
+    )
+    client.simulate_post(
+        '/orders',
+        body=json.dumps(TEST_ORDER2),
+    )
+    with open(fake_trade_file, 'r') as f:
+        # Test that one of the buy lines became filled
+        assert any(line.startswith('jill;MSFT;200;buy;') and line.endswith('filled\n') for line in f)
