@@ -1,8 +1,7 @@
 import csv
 import datetime
-import os
 import fileinput
-
+import os
 
 TRADES_FILE_PATH = 'data/trades.csv'
 SELL = 'sell'
@@ -11,79 +10,100 @@ FILLED = 'filled'
 OPEN = 'open'
 
 
+class TradeLine:
+    def __init__(self, line_string):
+        trader_id, ticker, quantity, amount_left, order_type, date_placed = line_string.strip().split(';')
+        self.trader_id = trader_id
+        self.ticker = ticker
+        self.quantity = int(quantity)
+        self.amount_left = int(amount_left)  # initially all is available for trade
+        self.date_placed = date_placed
+        self.order_type = order_type
+        self.status = 'filled' if amount_left == 0 else 'open'
+
+    def formatted(self):
+        return ";".join(
+            [self.trader_id, self.ticker, str(self.quantity), str(self.amount_left), self.order_type, self.date_placed])
+
+    @staticmethod
+    def format(trader_id, ticker, quantity, amount_left, order_type, date_placed):
+        return ";".join([trader_id, ticker, str(quantity), str(amount_left), order_type, str(date_placed)])
+
+    def get_trade_dict(self):
+        return {
+            'symbol': self.ticker,
+            'quantity': int(self.quantity),
+            'orderType': self.order_type,
+            'orderTime': self.date_placed,
+            'status': 'filled' if self.amount_left == 0 else 'open'
+        }
+
+    def attributes(self):
+        return [self.trader_id, self.ticker, self.quantity, self.amount_left, self.order_type, self.date_placed]
+
+    def __repr__(self):
+        return self.formatted()
+
+    def __str__(self):
+        return self.formatted()
+
+
 class Trade:
 
     def __init__(self, trader_id):
         self.trader_id = trader_id
 
-    def getUpdateTrades(self, ticker, quantity, orderType):
-        # We know this is open trade since its new
-        # Also dont care about when it was placed since its most recent anyways
-        trades_to_update = {}
-        total_sell_quantity = 0
+    def get_update_trades(self, ticker, quantity, orderType):
+        trades = []
         with open(TRADES_FILE_PATH, 'r') as f:
             for i, line in enumerate(f):  # l == line
-                if line.count(';') != 5: continue
-                l_id, l_ticker, l_quantity, l_type, l_date, l_status = line.strip().split(';')
-                l_quantity = int(l_quantity)
-                if l_id == self.trader_id or l_status == FILLED or l_ticker != ticker:  # skip if these conditions met
-                    continue
-                if orderType == SELL and l_type == BUY and l_quantity <= quantity:
-                    # if quantity of buy is less than the quantity of the sell, we can fulfill the buy
-                    quantity -= l_quantity
-                    trades_to_update[l_id, l_date] = l_quantity
-                    # uniquely identifies a trade, must make status == 'filled'
+                tl = TradeLine(line)
+                if tl.trader_id == self.trader_id or tl.status == FILLED or tl.ticker != ticker:
+                    # skip if these conditions met
+                    pass
+                elif orderType != tl.order_type:  # Buy/Sell or Sell/Buy
+                    diff = min(quantity, tl.amount_left)
+                    quantity -= diff
+                    tl.amount_left -= diff
+                trades.append(tl)
+        return trades, quantity
 
-                elif orderType == BUY and l_type == SELL and total_sell_quantity < quantity:
-                    trades_to_update[l_id, l_date] = l_quantity - max(0, total_sell_quantity - l_quantity)
-                    # update quantity if partial sell order was filled
-                    total_sell_quantity += l_quantity
+    @staticmethod
+    def update_trades_file(trades):
+        with fileinput.input(TRADES_FILE_PATH, inplace=True) as f:
+            for i, line in enumerate(f):
+                print(trades[i].formatted())
 
-            if orderType == SELL:
-                return trades_to_update
-            elif orderType == BUY and total_sell_quantity >= quantity:  # found enough open sells to fulfill the buy
-                return trades_to_update
-            else:
-                return {}  # cant update any trades right now
-
-    def updateTradesFile(self, trades):
-        for line in fileinput.input(TRADES_FILE_PATH, inplace=True):
-            if line.count(';') != 5:
-                print(line.strip())
-            l_id, l_ticker, l_quantity, l_type, l_date, l_status = line.strip().split(';')
-            if (l_id, l_date, ) in trades:
-                print(";".join([l_id, l_ticker, str(trades[l_id, l_date]), l_type, l_date, 'filled']))
-            else:
-                print(line.strip())
-
-    def writeToTradesFile(self, orders):
+    def write_to_trades_file(self, orders):
         now = datetime.datetime.now()
         append_write = 'a' if os.path.exists(TRADES_FILE_PATH) else 'w'
-        with open(TRADES_FILE_PATH, append_write, newline='') as csvfile:
-            writer = csv.writer(csvfile, delimiter=';', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-            for order in orders:
-                # all new trades are by default open
-                ticker = order.get('symbol')
-                quantity = int(order.get('quantity'))
-                orderType = order.get('orderType')
-                trades_to_update = self.getUpdateTrades(ticker, quantity, orderType)
-                status = 'filled' if bool(trades_to_update) else 'open'
-                writer.writerow([self.trader_id, ticker, quantity, orderType, now, status])
-                if trades_to_update:
-                    self.updateTradesFile(trades_to_update)
 
-    def getTradesForTrader(self):
+        # Open and close it so that it saves
+        csvfile = open(TRADES_FILE_PATH, append_write, newline='')
+        csvfile.close()
+
+        for order in orders:
+            # Get order variables
+            ticker = order.get('symbol')
+            quantity = int(order.get('quantity'))
+            order_type = order.get('orderType')
+
+            # Update the old trades first
+            new_trades, new_quantity = self.get_update_trades(ticker, quantity, order_type)
+            self.update_trades_file(new_trades)
+
+            # Open and write a line to the file
+            csvfile = open(TRADES_FILE_PATH, append_write, newline='')
+            writer = csv.writer(csvfile)
+            line = TradeLine.format(self.trader_id, ticker, quantity, new_quantity, order_type, now)
+            writer.writerow([line])
+            csvfile.close()
+
+    def get_trades_for_trader(self):
         trades = []
-        with open(TRADES_FILE_PATH, 'r') as csvfile:
-            for i, line in enumerate(csvfile):
-                t_id, symbol, quantity, orderType, timePlaced, status = line.strip().split(';')
-                if t_id == self.trader_id:
-                    trades.append({
-                        'symbol': symbol,
-                        'quantity': int(quantity),
-                        'orderType': orderType,
-                        'orderTime': str(timePlaced),
-                        'status': status
-                    })
+        with open(TRADES_FILE_PATH, 'r') as f:
+            for i, line in enumerate(f):
+                trade = TradeLine(line)
+                if self.trader_id == trade.trader_id:
+                    trades.append(trade.get_trade_dict())
         return trades
-
