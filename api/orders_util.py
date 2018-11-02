@@ -10,7 +10,7 @@ FILLED = 'filled'
 OPEN = 'open'
 
 
-class TradeLine:
+class TradeLine:  # Converts a line from the text file to an object of useful data
     def __init__(self, line_string):
         trader_id, ticker, quantity, amount_left, order_type, date_placed = line_string.strip().split(';')
         self.trader_id = trader_id
@@ -70,11 +70,14 @@ class Trade:
 
     @staticmethod
     def update_trades_file(trades):
+        # Update all lines in the text file with updated TradeLine objects
         with fileinput.input(TRADES_FILE_PATH, inplace=True) as f:
             for i, line in enumerate(f):
                 print(trades[i].formatted())
 
     def write_to_trades_file(self, orders):
+        """Goes through each order submitted by a user. After updating all orders in the text file,
+        then write the order to the end of the file"""
         now = datetime.datetime.now()
         append_write = 'a' if os.path.exists(TRADES_FILE_PATH) else 'w'
 

@@ -1,7 +1,10 @@
-#Schonfeld Coding Test
+#Schonfeld Coding Test Submission
 This test is meant to assess your thinking and problem solving skills. You will be building a small web app using docker and python and some libraries that you likely have not used before. Feel free to use google to gain a better understanding of the tooling but please do not have others help you with the project.
 
 Before you submit the project, please test it inside the docker container and make sure it works.
+
+##Testing
+To test this project, run `pytest` in the root directory with all dependencies installed. This project was built on python3.6.
 
 ##Setup
 1) Install and setup docker (https://docs.docker.com/install/)
